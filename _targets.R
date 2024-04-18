@@ -454,8 +454,7 @@ list(
     get.occ.clim(db.mauri,
                  clim.list=list(psi_eraday_real=psi_eradaycdo_real[,c("x","y","psi")],
                                 psi_eraday_real_beta=psi_eradaycdo_real_beta[,c("x","y","psi")],
-                                tmin_chelsa=tmin2m_era,
-                                tmin_era=tmin_era,
+                                tmin_era=tmin2m_era,
                                 mat=clim_chelsa[,c("x","y","mat")],
                                 map=clim_chelsa[,c("x","y","map")],
                                 pet=clim_chelsa[,c("x","y","pet")],
@@ -472,8 +471,8 @@ list(
     df.niche,
     get.niche(species.list,
               occurence,
-              psi="psi_cerraday_real",
-              tmin="tmin_cerra")
+              psi="psi_eraday_real",
+              tmin="tmin_era")
   ),
   tar_target(
     df.shadetol,
@@ -486,7 +485,7 @@ list(
                 df.preval,
                 df.shadetol,
                 df.niche,
-                traits,
+                traits_max,
                 file.output="output/df.species2.csv")
   ),
   NULL

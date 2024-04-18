@@ -332,3 +332,131 @@ get.prevalence <- function(species.list,
   return(df.traits[,c("species","prevalence")])
 }
 
+#' Compute niche caracteristics
+#' 
+#' @description compute mean lat/long and continentality of species niche
+#' @note Continentality from https://doi.org/10.1038/s41597-020-0464-0
+#' @param df.traits df of traits for each species
+#' @param db.clim database of pres/abs
+#' @return df.loc + extracted variables + computed variables
+#' 
+
+get.niche <- function(species.list,
+                      db.clim,
+                      psi="psi_cerraday_real",
+                      tmin="tmin_cerra"){
+  df.traits=data.frame(species=species.list)
+  
+  df.niche <- db.clim %>% 
+    filter(presence==1) %>% 
+    group_by(species) %>% 
+    summarise(lat.mean=mean(y),
+              lat.sd=sd(y),
+              long.mean=mean(x),
+              long.sd=sd(x),
+              lat.q05=quantile(y,prob=0.05)[[1]],
+              lat.q95=quantile(y,prob=0.95)[[1]],
+              psi.q05=quantile(eval(parse(text=psi)),prob=0.05,na.rm=TRUE)[[1]],
+              psi.q95=quantile(eval(parse(text=psi)),prob=0.95,na.rm=TRUE)[[1]],
+              tmin.q05=quantile(eval(parse(text=tmin)),prob=0.05,na.rm=TRUE)[[1]],
+              tmin.q95=quantile(eval(parse(text=tmin)),prob=0.95,na.rm=TRUE)[[1]]
+    )
+  
+  
+  # rast.cont=as.data.frame(mean(rast("data/jci_year.nc")),xy=TRUE) %>% 
+  #   mutate(z=x,
+  #          x=y,
+  #          y=z) %>% 
+  #   select(-z) %>% 
+  #   rast(crs="epsg:4326")
+  # df.traits$jci=NA
+  # for (sp in df.traits$species.binomial){
+  #   print(sp)
+  #   db.pres <- db.clim %>% 
+  #     filter(species.binomial==sp) %>% 
+  #     filter(presence==1)
+  #   db.pres <- cbind(db.pres,
+  #                    jci=extract(rast.cont,db.pres[,c("x","y")])[["mean"]])
+  #   jci=mean(db.pres$jci,na.rm=TRUE)
+  #   df.traits[df.traits$species.binomial==sp,"jci"]=jci
+  # }
+  
+  # df.overlap <- db.clim %>%
+  #   filter(presence==1) %>%
+  #   group_by(node) %>%
+  #   mutate(nb.sp=sum(presence==1),
+  #          overlap.hsm=sum(hsm>0),
+  #          overlap.fsm=sum(fsm.winter>0)) %>%
+  #   ungroup() %>%
+  #   group_by(species.binomial) %>%
+  #   summarise(overlap=mean(nb.sp),
+  #             overlap.hsm=mean(overlap.hsm,na.rm=TRUE),
+  #             overlap.fsm=mean(overlap.fsm,na.rm=TRUE))
+  
+  df.traits <- df.traits %>%
+    left_join(df.niche,by="species") #%>%
+  # left_join(df.overlap,by="species.binomial")
+  return(df.traits[,c("species","lat.mean","lat.sd","long.mean","long.sd",
+                      "lat.q05","lat.q95","psi.q05","psi.q95","tmin.q05","tmin.q95")])#,"jci","overlap","overlap.hsm","overlap.fsm"
+}
+
+
+#' Get shade tol
+#' 
+#' @description compute mean lat/long and continentality of species niche
+#' @note Continentality from https://doi.org/10.1038/s41597-020-0464-0
+#' @param df.traits df of traits for each species
+#' @return df.loc + extracted variables + computed variables
+#' 
+
+get.shadetol <- function(species.list,
+                         db.clim){
+  df.traits=data.frame(species=species.list)
+  df.shadetol=read.csv2("data/Species traits/data_Niinemets&Valladares_2006.csv")
+  df.traits=df.traits %>% 
+    left_join(df.shadetol,by=c("species"="Species")) |> 
+    mutate(across(c(shade_tolerance.mean,drought_tolerance.mean,waterlogging_tolerance.mean),
+                  as.numeric))
+  
+  df.overlapshade=db.clim |>
+    filter(presence==1) |> 
+    select(node,species,presence) |> 
+    left_join(df.traits[,c("species","shade_tolerance.mean","drought_tolerance.mean")], by="species") |> 
+    filter(!is.na(shade_tolerance.mean)&
+             !is.na(drought_tolerance.mean)) |> 
+    group_by(node) |> 
+    mutate(overlap_plot_shade=colSums(outer(shade_tolerance.mean,shade_tolerance.mean,">")),
+           overlap_plot_drought=colSums(outer(drought_tolerance.mean,drought_tolerance.mean,">"))) |> #shade_overlap(shade_tolerance.mean,presence) 
+    ungroup() |> 
+    group_by(species) |> 
+    summarise(overlap_shade=mean(overlap_plot_shade),
+              overlap_drought=mean(overlap_plot_drought))
+  
+  df.traits=df.traits %>% 
+    left_join(df.overlapshade,by=c("species"))
+  return(df.traits[,c("species","shade_tolerance.mean","drought_tolerance.mean","waterlogging_tolerance.mean","overlap_shade","overlap_drought")]) 
+}
+
+#' Get traits and caract
+#' 
+#' @description compute niche traits and caract
+#' @param df.traits df of traits for each species
+#' @return df.loc + extracted variables + computed variables
+#' 
+
+get.species <- function(species.list,
+                        df.preval,
+                        df.shadetol,
+                        df.niche,
+                        df.traits,
+                        file.output){
+  df.species <- data.frame(species=species.list) %>% 
+    left_join(df.shadetol,by="species")%>% 
+    left_join(df.niche,by="species")%>% 
+    left_join(df.traits,by="species") |> 
+    left_join(df.preval,by="species")
+  fwrite(df.species,file=file.output)
+  return(df.species) 
+}
+
+
