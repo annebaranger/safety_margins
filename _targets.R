@@ -388,8 +388,19 @@ list(
                )
     )
   ),
-  
-  
+  tar_target(
+    clim_chelsa_node,
+    clim_chelsa |> 
+      mutate(cell=row_number())
+  ),
+  tar_target(
+    psi_eradaycdo_real_dws,
+    terra::project(rast(psi_eradaycdo_real[,c("x","y","psi")],
+                        crs="epsg:4326"),
+                   rast(clim_chelsa,crs="epsg:4326"),
+                   method="average") |> 
+      as.data.frame(xy=TRUE)
+  ),
   #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   # -- Load traits -----
   #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -447,7 +458,22 @@ list(
                                 pet=clim_chelsa[,c("x","y","pet")],
                                 sgdd=clim_chelsa[,c("x","y","sgdd")],
                                 wai=clim_chelsa[,c("x","y","wai")]),
+                 dws=FALSE,
                  file.path="output/df.occurence.clim.csv")
+  ),
+  tar_target(
+    occurence.binom,
+    get.occ.clim(db.mauri,
+                 clim.list=list(psi_eraday_real=psi_eradaycdo_real_dws[,c("x","y","psi")],
+                                tmin_era=tmin2m_era,
+                                mat=clim_chelsa_node[,c("x","y","mat")],
+                                map=clim_chelsa_node[,c("x","y","map")],
+                                pet=clim_chelsa_node[,c("x","y","pet")],
+                                sgdd=clim_chelsa_node[,c("x","y","sgdd")],
+                                wai=clim_chelsa_node[,c("x","y","wai")],
+                                cell=clim_chelsa_node[,c("x","y","cell")]),
+                 dws=TRUE,
+                 file.path="output/df.occurence.clim.binom.csv")
   ),
   tar_target(
     occurence_beta,
@@ -460,6 +486,7 @@ list(
                                 pet=clim_chelsa[,c("x","y","pet")],
                                 sgdd=clim_chelsa[,c("x","y","sgdd")],
                                 wai=clim_chelsa[,c("x","y","wai")]),
+                 dws=FALSE,
                  file.path="output/df.occurence.clim.beta.csv")
   ),
   tar_target(

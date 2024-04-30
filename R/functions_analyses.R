@@ -69,11 +69,12 @@ get_mauri <- function(dir.occ,species.list){
 
 get.occ.clim<-function(db.mauri,
                        clim.list,
+                       dws=FALSE,
                        file.path){
   ## Load safe ty margin indicators
   clim.list=lapply(clim.list,rast)
   df.clim=lapply(seq_along(clim.list),function(x) {
-    df=extract(clim.list[[x]],data.frame(x=db.mauri$x,y=db.mauri$y))[-1]
+    df=terra::extract(clim.list[[x]],data.frame(x=db.mauri$x,y=db.mauri$y))[-1]
     colnames(df)=names(clim.list)[x]
     return(df)}
   )
@@ -82,6 +83,18 @@ get.occ.clim<-function(db.mauri,
                   as.data.frame(df.clim))
   
   db.mauri$presence[is.na(db.mauri$presence)] <- 0
+  
+  
+  if(dws){
+    var_names=c("cell",names(clim.list)[names(clim.list)!="cell"],"species")
+    db.mauri<-db.mauri |> 
+      group_by_at(var_names) |> 
+      summarize(presence_count=sum(presence,na.rm = TRUE),
+                n=n(),
+                x=mean(x),
+                y=mean(y)) |> 
+      ungroup()
+  }
   
   fwrite(db.mauri,file.path)
   # write.csv(df.fdg.sp,"output/LT50_spring.csv")
