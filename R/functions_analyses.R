@@ -473,3 +473,118 @@ get.species <- function(species.list,
 }
 
 
+#' Fit random model with cross validation
+#' 
+#'@description fit random model for each species
+#'@param db.clim
+#'@param df.traits
+#'@param sp.excl
+#'@return file of model fit
+
+fit_random_sp<-function(occurence,
+                        df.species,
+                        var.hsm="psi_eraday_real",
+                        var.fsm="tmin_era",
+                        sp.excl,
+                        folder.out="mod.rdata"){
+  print(sp.excl)
+  if(!dir.exists(folder.out)){dir.create(folder.out)}
+  
+ 
+  
+  db.clim=occurence %>% 
+    ungroup() |> 
+    left_join(df.species) |> 
+    mutate(hsm:=(!!sym(var.hsm)/1000)-px,
+           fsm:=!!sym(var.fsm)-lt50)  |> 
+    filter(!is.na(hsm)) |> 
+    filter(!is.na(fsm)) |> 
+    filter(hsm>quantile(hsm,prob=0.01)) |> 
+    filter(fsm>quantile(hsm,prob=0.01)) |> 
+    filter(!is.na(wai)) |> 
+    filter(!is.na(mat)) |> 
+    filter(species!=sp.excl) 
+  species.select=sample(unique(db.clim$species),20)
+  db.clim=db.clim |> 
+    filter(species %in% species.select) |> 
+    group_by(species) |> 
+    sample_n(20000) |> 
+    ungroup()
+  
+  data.list<-list(N=dim(db.clim)[1],
+                  S=nlevels(as.factor(db.clim$species)),
+                  max=max(db.clim$n),
+                  presence=db.clim$presence_count,
+                  draw=db.clim$n,
+                  species=as.numeric(as.factor(db.clim$species)),
+                  fsm=db.clim$fsm,
+                  hsm=db.clim$hsm)
+ 
+  fit.allsp <- stan(file = "glm_log_all.stan",
+                    data=data.list,
+                    # init=init,
+                    iter=500,
+                    chains=3,
+                    core=3,
+                    include=FALSE,
+                    pars=c("proba","K_vect"))
+  
+  file_path=file.path(folder.out,paste0(sp.excl,".rdata"))
+  save(file_path)
+  
+  post<-as.data.frame(t(summary(fit.allsp)$summary)) |> 
+    select(!matches("K_sp"))
+  
+  
+  db.clim_pred<-occurence %>% 
+    ungroup() |> 
+    left_join(df.species) |> 
+    mutate(hsm:=(!!sym(var.hsm)/1000)-px,
+           fsm:=!!sym(var.fsm)-lt50)  |> 
+    filter(!is.na(hsm)) |> 
+    filter(!is.na(fsm)) |> 
+    filter(hsm>(-10000)) |> 
+    filter(!is.na(wai)) |> 
+    filter(!is.na(mat)) |> 
+    filter(species==sp.excl) |> 
+    # filter(species.binomial==sp) |> 
+    select(species,presence_count,x,y,hsm,fsm,mat,wai) |> 
+    mutate(presence=as.numeric(presence_count>0),
+           pred_sfm=post$K_int[1]/
+             ((1+exp(-post$r_fsm[1]*(fsm-post$t_fsm[1])))*
+                (1+exp(-post$r_hsm[1]*(hsm-post$t_hsm[1])))),
+           tss=NA,
+           thres=NA
+    ) 
+  
+  calc_tss <- function(threshold, observed, predicted_probs) {
+    observed=as.factor(observed)
+    predicted <- ifelse(predicted_probs > threshold, 1, 0)
+    predicted=factor(predicted,levels=c(0,1))
+    conf_matrix <- table(observed, predicted)
+    TP <- conf_matrix[2, 2]
+    FN <- conf_matrix[2, 1]
+    TN <- conf_matrix[1, 1]
+    FP <- conf_matrix[1, 2]
+    sensitivity <- TP / (TP + FN)
+    specificity <- TN / (TN + FP)
+    TSS <- sensitivity + specificity - 1
+    return(c(TSS,specificity,sensitivity))
+  }
+  
+  observed <- db.clim_pred$presence
+  predicted<- db.clim_pred$pred_sfm
+  threshold_max=post$K_int[1]
+  thresholds <- seq(0,threshold_max, length.out=100)
+  tss_sfm <- sapply(thresholds, calc_tss, observed, predicted)
+  out=data.frame(species=sp.excl,
+                 file=file_path,
+                 tss=max(tss_sfm[1,]),
+                 specificity=tss_sfm[2,which.max(tss_sfm[1,])],
+                 sensitivity=tss_sfm[3,which.max(tss_sfm[1,])],
+                 thresh_tss=thresholds[which.max(tss_sfm[1,])],
+                 rhat=post$rhat[1])
+  
+  return(out)
+  
+}
