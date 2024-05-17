@@ -27,9 +27,9 @@ source("R/functions_analyses.R")
 
 # install if needed and load packages
 packages.in <- c("stringr","ggplot2","data.table","tidyr","future",
-                 "viridis","rgdal","raster","rosm","terra","rnaturalearth",
+                 "viridis","raster","rosm","terra","rnaturalearth", #"rgdal",
                  "dplyr","sf","lubridate","lme4","rstan")
-for(i in 1:length(packages.in)) if(!(packages.in[i] %in% rownames(installed.packages()))) install.packages(packages.in[i])
+#for(i in 1:length(packages.in)) if(!(packages.in[i] %in% rownames(installed.packages()))) install.packages(packages.in[i])
 # Targets options
 options(tidyverse.quiet = TRUE, clustermq.scheduler = "multiprocess")
 tar_option_set(packages = packages.in,

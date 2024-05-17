@@ -504,33 +504,34 @@ fit_random_sp<-function(occurence,
     filter(!is.na(wai)) |> 
     filter(!is.na(mat)) |> 
     filter(species!=sp.excl) 
-  species.select=sample(unique(db.clim$species),20)
-  db.clim=db.clim |> 
-    filter(species %in% species.select) |> 
-    group_by(species) |> 
-    sample_n(20000) |> 
+  # species.select=sample(unique(db.clim$species),20)
+  db.clim=db.clim |>
+    # filter(species %in% species.select) |>
+    group_by(species) |>
+    sample_frac(0.6) |>
     ungroup()
-  
+
   data.list<-list(N=dim(db.clim)[1],
                   S=nlevels(as.factor(db.clim$species)),
-                  max=max(db.clim$n),
+                  max_draws=max(db.clim$n),
                   presence=db.clim$presence_count,
                   draw=db.clim$n,
                   species=as.numeric(as.factor(db.clim$species)),
                   fsm=db.clim$fsm,
                   hsm=db.clim$hsm)
- 
-  fit.allsp <- stan(file = "glm_log_all.stan",
+  print(paste0("Launching model for species : ",sp.excl))
+  
+  fit.allsp <- stan(file = "glm_log_all_betapareto.stan",
                     data=data.list,
                     # init=init,
-                    iter=500,
+                    iter=1000,
                     chains=3,
                     core=3,
                     include=FALSE,
                     pars=c("proba","K_vect"))
   
   file_path=file.path(folder.out,paste0(sp.excl,".rdata"))
-  save(file_path)
+  save(fit.allsp,file=file_path)
   
   post<-as.data.frame(t(summary(fit.allsp)$summary)) |> 
     select(!matches("K_sp"))
@@ -588,3 +589,5 @@ fit_random_sp<-function(occurence,
   return(out)
   
 }
+
+
