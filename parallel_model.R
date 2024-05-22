@@ -11,8 +11,10 @@ file_df.species="df.species"
 occurence=readRDS(file_occurence)
 df.species=readRDS(file_df.species)
 
-species_fit_list=(df.species |> filter(!is.na(px),!is.na(lt50)) |> 
-  filter(species %in% unique(occurence$species)))$species
+# species_fit_list=(df.species |> filter(!is.na(px),!is.na(lt50)) |> 
+#   filter(species %in% unique(occurence$species)))$species
+load("species_to_fit.RData")
+species_fit_list=species_to_fit
 
 var.hsm="psi_eraday_real"
 var.fsm="tmin_era"

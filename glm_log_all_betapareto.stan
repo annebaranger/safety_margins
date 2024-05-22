@@ -15,7 +15,7 @@ data {
 // the parameters to be estimated from the data
 parameters {
   real <lower=0,upper=1> K_int;
-  real <lower=0> lambda;
+  real <lower=2> lambda;
   vector <lower=0,upper=1> [S] K_sp; // plateau of the second segment, or threshold value
   real <lower=0.1> r_fsm;
   real<lower=0.1> r_hsm;
@@ -38,9 +38,10 @@ model {
   //priors
   // K_int ~ beta(20,60); 
   // lambda ~ pareto(4, 7); 
-  K_int ~ beta(2.5,15);
-  lambda ~ gamma(6,0.5);
-  
+  // K_int ~ beta(2.5,15);
+  // lambda ~ gamma(6,0.5);
+  K_int ~ beta(1.5,15);
+  lambda ~ gamma(18,0.5);
   
   K_sp ~ beta(lambda * K_int, lambda * (1 - K_int));
   
