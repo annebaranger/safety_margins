@@ -48,11 +48,13 @@ calc_tss <- function(threshold, observed, predicted_probs) {
 
 
 # load each species model
-file.list=list.files("mod.rdata/quadri/")
+file.sandy=list.files("mod.rdata/sandy/")
+file.quadri=list.files("mod.rdata/quadri/")[!list.files("mod.rdata/quadri/") %in% file.sandy]
+file.list=c(paste0("mod.rdata/sandy/",file.sandy),paste0("mod.rdata/quadri/",file.quadri))
 species_issue=c()
 file_issue=c()
 for(file in file.list){
-  load(file.path("mod.rdata/quadri",file))
+  load(file)
   if(sum(as.data.frame(summary(fit.allsp)$summary)$Rhat>1.1)>0){
     species_issue=c(species_issue,str_sub(file,1,-7))
     file_issue=c(file_issue,file)
@@ -63,9 +65,9 @@ file_valid=file.list[!file.list %in% file_issue]
 out=setNames(data.frame(matrix(ncol = 8, nrow = 0)), c("species","k_int", "lambda","tss", "specificity","sensitivity","thresh_tss","auc"))
 
 for(file in file_valid){
-  load(file.path("mod.rdata/quadri",file))
+  load(file)
   post<-as.data.frame(t(summary(fit.allsp)$summary))
-  sp<-str_sub(file,1,-7)
+  sp<-str_sub(strsplit(file, "/")[[1]][[3]],1,-7)
   db.clim_pred<-db.clim |>
     filter(species==sp) |>
     dplyr::select(species,presence_count,x,y,hsm,fsm,mat,wai) |>
