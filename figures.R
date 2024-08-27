@@ -30,6 +30,15 @@ tar_load(margin.limit)
 #%%%%%%%%%%%%%%
 predictor=c("tmin_era","psi_eraday_real","wai","pet","map","mat","prpet","sgdd")
 
+# compute correlations
+db.pred<-db.clim |> 
+  select(x,y,map,pet,psi_eraday_real,mat,tmin_era) |> 
+  distinct() |> 
+  drop_na()
+cor.test(db.pred$pet,db.pred$psi_eraday_real)
+cor.test(db.pred$map,db.pred$psi_eraday_real)
+cor.test(db.pred$mat,db.pred$tmin_era)
+
 # get climatic data and traits by species 
 db.clim.lm <- db.clim |>  
   filter(presence==1) |> 
@@ -141,7 +150,7 @@ df.lm.traits |>
                         TRUE~pred)) |> 
   mutate(quant=forcats::fct_recode(quant, "5%"="quant05", "95%"="quant95")) |> 
   ggplot(aes(x=mean,y=pred,color=quant))+
-  geom_point(size=2.5,alpha=0.6,position=position_dodge(width=0.5))+ #,position=position_dodge(width=0.5)
+  geom_point(size=1.5,alpha=0.6,position=position_dodge(width=0.5))+ #,position=position_dodge(width=0.5)
   geom_pointrange(aes(xmin=conf.low,xmax=conf.up),position=position_dodge(width=0.5))+ #,position=position_dodge(width=0.5)
   geom_text(aes(label = text1,
                 x=mean,
