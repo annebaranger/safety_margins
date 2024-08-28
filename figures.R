@@ -38,6 +38,35 @@ db.pred<-db.clim |>
 cor.test(db.pred$pet,db.pred$psi_eraday_real)
 cor.test(db.pred$map,db.pred$psi_eraday_real)
 cor.test(db.pred$mat,db.pred$tmin_era)
+db.clim.cor <- db.clim |>  
+  filter(presence==1) |> 
+  filter(psi_eraday_real>(-15000)) |>
+  left_join(margin.limit) |> 
+  mutate(prpet=map-pet) |> 
+  pivot_longer(cols=all_of(predictor)) |> 
+  group_by(name) |> 
+  mutate(value=scale(value)) |> 
+  ungroup() |> 
+  group_by(species,hsm.valid.3,fsm.valid.2,name,lt50,px) |> 
+  summarise(quant05=quantile(value,probs=0.05,na.rm=TRUE)[[1]],
+            quant5=quantile(value,probs=0.5,na.rm=TRUE)[[1]],
+            quant95=quantile(value,probs=0.95,na.rm=TRUE)[[1]]) |> 
+  ungroup() |> 
+  mutate(lt50=scale(lt50)[,1],
+         px=scale(px)[,1],
+         quant=case_when(name%in%c("map","psi_eraday_real","mat","tmin_era","prpet")~quant05,
+                         TRUE~quant95)) |> 
+  select(species,name,quant) |> 
+  pivot_wider(names_from = name,
+              values_from = quant) |> 
+  rename("Tmin"=tmin_era,
+         "Pmin"="psi_eraday_real",
+         "map-pet"="prpet")
+figpair<-ggpairs(db.clim.cor,columns=c(2:6,8))
+# ggsave(figpair,file="pairplots.png",
+#        width=11,
+#        height = 11,
+#        dpi=600)
 
 # get climatic data and traits by species 
 db.clim.lm <- db.clim |>  
@@ -148,28 +177,26 @@ df.lm.traits |>
   mutate(pred=case_when(pred=="tmin_era"~"$T_{min}$",
                         pred=="psi_eraday_real"~"$\\Psi_{min}$",
                         TRUE~pred)) |> 
-  mutate(quant=forcats::fct_recode(quant, "5%"="quant05", "95%"="quant95")) |> 
+  mutate(quant=forcats::fct_recode(quant, "5%"="quant05", "95%"="quant95")) |>  
   ggplot(aes(x=mean,y=pred,color=quant))+
-  geom_point(size=1.5,alpha=0.6,position=position_dodge(width=0.5))+ #,position=position_dodge(width=0.5)
-  geom_pointrange(aes(xmin=conf.low,xmax=conf.up),position=position_dodge(width=0.5))+ #,position=position_dodge(width=0.5)
+  # geom_point(size=0.5,shape=4,alpha=0.6,position=position_dodge(width=0.5))+ #,position=position_dodge(width=0.5)
+  geom_pointrange(aes(xmin=conf.low,xmax=conf.up),size=0.1,position=position_dodge(width=0.5))+ #,position=position_dodge(width=0.5)
   geom_text(aes(label = text1,
                 x=mean,
-                y=pred
-  ),
-  # position = position_dodge(9),
-  size=15/.pt,
-  show.legend = FALSE,
-  vjust=-0.25)+
+                y=pred),
+            # position = position_dodge(9),
+            size=15/.pt,
+            show.legend = FALSE,
+            vjust=-0.25)+
   geom_text(aes(label = text2,
                 x=mean,
-                y=pred
-  ),
-  # position = position_dodge(9),
-  size=8/.pt,
-  show.legend = FALSE,
-  vjust=2)+
+                y=pred),
+            # position = position_dodge(9),
+            size=8/.pt,
+            show.legend = FALSE,
+            vjust=2)+
   geom_vline(xintercept = 0,linetype="dotted")+
-  scale_color_manual(values=c("darkred","lightblue"))+ 
+  scale_color_manual(values=c("darkred","lightblue"))+
   scale_y_discrete(label=TeX)+
   facet_wrap(~trait,
              labeller=as_labeller(TeX,
@@ -183,7 +210,7 @@ df.lm.traits |>
         legend.position = "top",
         axis.text.y = element_text(hjust=0.5),
         text=element_text(size=11))+
-  xlim(-1,1.1)+
+  xlim(-1,1.3)+
   labs(color="Quantiles")->fig1
 
 
@@ -230,9 +257,9 @@ c<-safmarg_sp_select %>%
   # scale_color_gradientn(colours = viridis(15,direction=-1),
   #                       breaks=c(0,0.1,0.2,0.3,0.4,0.5,0.6))+
   guides(alpha="none")+
-  labs(color="Species prevalence")+
+  labs(color="Species prevalence",y="Probability of presence")+
   theme_minimal()+
-  theme(axis.title= element_blank(),
+  theme(axis.title.x= element_blank(),
         axis.ticks.x = element_line(linewidth = 0.6),
         axis.line = element_line(linewidth = 0.6),
         legend.position = "none",
@@ -270,12 +297,12 @@ safmarg_sp_select %>%
   filter(mod!="none") %>% 
   filter(!(mod=="fsm"&name=="HSM")&
            !(mod=="hsm"&name=="FSM")) %>% 
-  ggplot(aes(name,value,fill=taxa))+
+  ggplot(aes(value,name,fill=taxa))+
   geom_boxplot()+
   geom_text(data=df.n,
-            mapping=aes(x=name,y=value,label=n),
+            mapping=aes(x=value,y=name,label=n),
             position = position_dodge(width=0.75),
-            vjust=2.5,
+            hjust=2.5,
             size=9/.pt)+
   geom_signif(comparisons = list(c("HSM","FSM")),
               map_signif_level = TRUE)+
@@ -330,12 +357,12 @@ safmarg_sp_select %>%
   group_by(threshold) |> 
   mutate(n=n()) |> 
   ungroup() |> 
-  ggplot(aes(threshold,threshold_val,fill=taxa))+
+  ggplot(aes(threshold_val,threshold,fill=taxa))+
   geom_boxplot()+
   geom_text(data=df.n,
-            mapping=aes(x=threshold,y=value,label=n),
+            mapping=aes(x=value,y=threshold,label=n),
             position = position_dodge(width=0.75),
-            vjust=-0.5,
+            hjust=-0.5,
             size=8/.pt)+
   geom_signif(comparisons = list(c("HSM","FSM")),
               map_signif_level = TRUE)+
@@ -360,19 +387,22 @@ safmarg_sp_select %>%
 
 cowplot::plot_grid(
   c,
-  cowplot::plot_grid(get_legend(b),
-                     cowplot::plot_grid(a+theme(legend.position = "none"),
+  cowplot::plot_grid(cowplot::plot_grid(a+theme(legend.position = "none"),
                                         b+theme(legend.position = "none"),
-                                        nrow=1),
-                     nrow=2,
-                     rel_heights = c(0.2,1),
-                     rel_widths = c(0.2,1),
+                                        ncol=1),
+                     get_legend(b),
+                     ncol=2,
+                     # rel_heights = c(1,0.2),
+                     rel_widths = c(1,0.3),
                      axis="l"
   ),
+  nrow=2,
   labels=c("A","B"),
   label_size = 12,
-  hjust=c(-0.2,0.51),
-  rel_widths = c(1.1,0.6)
+  # hjust=c(-0.2,0.51),
+  rel_heights = c(1,0.6),
+  # rel_widths = c(1,0.2),
+  axis="r"
 )->fig2
 
 
@@ -552,14 +582,15 @@ db.clim |>
   pivot_longer(cols=c("5%","95%"),
                names_to = "Quantile",
                values_to = "val") |> 
-  ggplot(aes(lt50,val,color=Quantile))+
+  ggplot(aes(val,lt50,color=Quantile))+
   geom_point()+
-  geom_smooth(method="gam")+
+  geom_smooth(method="lm")+
   scale_color_manual(values=c("darkred","lightblue"))+
   theme_minimal()+
-  labs(x="LT50")+
-  theme(axis.title.y = element_blank(),
-        text = element_text(size=11))+
+  labs(y="LT50")+
+  theme(axis.title.x = element_blank(),
+        text = element_text(size=11),
+        legend.position = "bottom")+
   facet_wrap(~name,
              labeller=as_labeller(TeX,
                                   default = label_parsed),
@@ -584,14 +615,15 @@ db.clim |>
   pivot_longer(cols=c("5%","95%"),
                names_to = "Quantile",
                values_to = "val") |> 
-  ggplot(aes(p50,val,color=Quantile))+
+  ggplot(aes(val,p50,color=Quantile))+
   geom_point()+
-  geom_smooth(method="gam")+
+  geom_smooth(method="lm")+
   scale_color_manual(values=c("darkred","lightblue"))+
   theme_minimal()+
-  labs(x="P50")+
-  theme(axis.title.y = element_blank(),
-        text = element_text(size=11))+
+  labs(y="P50")+
+  theme(axis.title.x= element_blank(),
+        text = element_text(size=11),
+        legend.position = "bottom")+
   facet_wrap(~name,
              labeller=as_labeller(TeX,
                                   default = label_parsed),
