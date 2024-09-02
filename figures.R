@@ -64,8 +64,8 @@ db.clim.cor <- db.clim |>
          "map-pet"="prpet")
 figpair<-ggpairs(db.clim.cor,columns=c(2:6,8))
 # ggsave(figpair,file="pairplots.png",
-#        width=11,
-#        height = 11,
+#        width=7,
+#        height = 7,
 #        dpi=600)
 
 # get climatic data and traits by species 
